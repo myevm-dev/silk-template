@@ -8,6 +8,33 @@ import { keccak256 } from 'ethereum-cryptography/keccak';
 import { utf8ToBytes } from 'ethereum-cryptography/utils';
 import { initSilk } from '@silk-wallet/silk-wallet-sdk';
 
+// Function to generate a compliant password for Silk's authentication
+const generateCompliantPassword = (basePassword: string): string => {
+  let password = basePassword;
+
+  // Ensure at least one uppercase letter
+  if (!/[A-Z]/.test(password)) password += 'A';
+  // Ensure at least one lowercase letter
+  if (!/[a-z]/.test(password)) password += 'a';
+  // Ensure at least one number
+  if (!/[0-9]/.test(password)) password += '1';
+  // Ensure at least one special character
+  if (!/[^A-Za-z0-9]/.test(password)) password += '!';
+  // Ensure the password is at least 14 characters long
+  while (password.length < 14) password += 'x';
+
+  return password;
+};
+
+// Function to generate an Ethereum-like address using thumbprint + password
+const generateEthereumAddress = (thumbprint: string, password: string): string => {
+  const combinedData = thumbprint + password;
+  const dataBytes = utf8ToBytes(combinedData);
+  const hash = keccak256(dataBytes);
+  const ethereumAddress = `0x${Buffer.from(hash).toString('hex').slice(0, 40)}`;
+  return ethereumAddress;
+};
+
 export default function Home() {
   const { connected, walletClient, userAddress } = useWallet();
   const [hashedAddress, setHashedAddress] = useState("");
@@ -17,60 +44,31 @@ export default function Home() {
   // Handle thumbprint + password login
   const handleLogin = async () => {
     try {
-      const publicKey: PublicKeyCredentialCreationOptions = {
-        challenge: new Uint8Array(16),
-        rp: { name: "My PWA" },
-        user: {
-          id: new Uint8Array(16),  // Unique user ID
-          name: "anonymous",  // Placeholder for name
-          displayName: "User",  // Placeholder for display name
-        },
-        pubKeyCredParams: [{ type: "public-key", alg: -7 }],
-        authenticatorSelection: { 
-          authenticatorAttachment: "platform", 
-          userVerification: "required" 
-        },
-        timeout: 60000,
-        attestation: "direct",
-      };
+      const thumbprint = 'user-thumbprint';  // Replace with actual thumbprint data
+      const password = prompt("Enter your password");
+      if (!password) throw new Error("Password required");
 
-      // Step 1: Use WebAuthn API to authenticate thumbprint
-      const credential = await navigator.credentials.create({ publicKey });
-      if (credential) {
-        const password = prompt("Enter your password");
-        if (!password) throw new Error("Password required");
+      // Generate the same Ethereum wallet every time based on thumbprint + password
+      const ethereumAddress = generateEthereumAddress(thumbprint, password);
+      setHashedAddress(ethereumAddress);
+      console.log("Generated Ethereum Address:", ethereumAddress);
 
-        // Step 2: Combine thumbprint data and password
-        const combinedData = credential.id + password;
+      // Make the password compliant for Silk SDK submission (if necessary)
+      const compliantPassword = generateCompliantPassword(password);
 
-        // Step 3: Hash the combined data using Keccak256
-        const dataBytes = utf8ToBytes(combinedData);
-        const hash = keccak256(dataBytes);
+      // Now submit the compliant password to Silk SDK for authentication
+      const silkProvider = initSilk();
 
-        // Step 4: Use the first 20 bytes of the hash to create an Ethereum-like address
-        const hashedAddress = `0x${Buffer.from(hash).toString('hex').slice(0, 40)}`;
-        setHashedAddress(hashedAddress);
+      await silkProvider.request({
+        method: 'silk_finishAuthentication', // Hypothetical Silk SDK method
+        params: { password: compliantPassword },
+      });
 
-        const silkProvider = initSilk();
+      console.log("Final authentication step completed!");
+      setIsLoggedInWithThumbprint(true);
 
-        // Step 5: Request authorization first
-        await silkProvider.request({ method: 'eth_requestAccounts' });
-
-        // Step 6: Then query for the accounts
-        const silkLoginResponse = (await silkProvider.request({
-          method: 'eth_accounts',
-          params: [hashedAddress],
-        })) as string[];
-
-        if (silkLoginResponse.includes(hashedAddress)) {
-          console.log('Logged in with hashed address:', hashedAddress);
-          setIsLoggedInWithThumbprint(true);
-        } else {
-          throw new Error('Failed to log in with the hashed address');
-        }
-      }
     } catch (err) {
-      console.error('Error during thumbprint login:', err as Error);
+      console.error("Error during authentication step:", err);
       setError((err as Error).message);
     }
   };
@@ -82,7 +80,7 @@ export default function Home() {
         {isLoggedInWithThumbprint ? (
           <>
             <div className="p-4 rounded-md border-black border bg-white w-1/2">
-              <h2 className="text-lg font-semibold mb-2">Hashed Address</h2>
+              <h2 className="text-lg font-semibold mb-2">Hashed Address (Ethereum Wallet)</h2>
               <p className="mt-2 text-gray-600 break-all">{hashedAddress}</p>
             </div>
           </>
