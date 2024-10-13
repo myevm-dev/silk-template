@@ -1,4 +1,5 @@
 'use client';
+
 import React, { useState } from 'react';
 import PersonalSign from "@/components/PersonalSign";
 import SwitchChains from "@/components/SwitchChains";
@@ -50,10 +51,12 @@ export default function Home() {
         const hashedAddress = `0x${Buffer.from(hash).toString('hex').slice(0, 40)}`;
         setHashedAddress(hashedAddress);
 
-        // Step 5: Initialize Silk SDK and directly use hashed address as login credential
         const silkProvider = initSilk();
 
-        // Simulate login with the hashed address
+        // Step 5: Request authorization first
+        await silkProvider.request({ method: 'eth_requestAccounts' });
+
+        // Step 6: Then query for the accounts
         const silkLoginResponse = (await silkProvider.request({
           method: 'eth_accounts',
           params: [hashedAddress],
