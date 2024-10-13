@@ -3,7 +3,7 @@
   "author": "Nestor Bonilla",
   "version": "0.1.0",
   "private": true,
-  "type": "module",  
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -16,6 +16,7 @@
     "@silk-wallet/silk-wallet-sdk": "^0.0.26",
     "@tanstack/react-query": "^5.51.23",
     "crypto-hash": "^3.1.0",
+    "ethereum-cryptography": "^3.0.0",
     "next": "14.2.5",
     "react": "^18",
     "react-dom": "^18",
